@@ -3,8 +3,8 @@
 #ifndef _GAMEINFO
 #define _GAMEINFO
 typedef struct gameInfoStruct {
-    HMODULE client;
-    DWORD engine;
+    HANDLE client;
+    HANDLE engine;
     DWORD glowObjManager;
     DWORD localPlayer;
 

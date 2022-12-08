@@ -4,11 +4,11 @@
 #define _GLOWSTRUCT
 typedef struct glowStruct {
     int32_t m_nNextFreeSlot;           //0x0000
-    class IClientEntity* m_pEntity;    //0x0004
+    DWORD* m_pEntity;    //0x0004
     float r;                           //0x0008
+    float g;                           //0x0014
     float b;                           //0x000C
     float a;                           //0x0010
-    float g;                           //0x0014
     uint8_t unk1[16];                  //0x0018   
     bool m_bRenderWhenOccluded;        //0x0028   
     bool m_bRenderWhenUnoccluded;      //0x0029

@@ -10,6 +10,8 @@ extern "C" __declspec(dllexport) BOOL vowelMain();
 int modelEnglow(DWORD localTeam, bool glowTeammates);
 Vector3 calcAngles(const Vector3& localPosition, const Vector3& enemyPosition, const Vector3& viewAngles);
 int modelEnglowThread(DWORD localTeam);
+int aimAtHead(DWORD localTeam, bool throughObjects);
+void changeSettings();
 
 char str1[256] = {0};
 char str2[256] = {0};
@@ -17,6 +19,8 @@ char str2[256] = {0};
 gameInfoStruct gameInfo;
 bool glowOn = true;
 bool glowTeammates = true;
+bool aimOn = true;
+bool aimThroughObjects = false;
 
 #ifdef _DEBUG
 #define print(value1, value2) sprintf(str1, "%x", value1); \
@@ -37,7 +41,6 @@ typedef struct vector3 {
 DWORD WINAPI vowelThread(LPVOID params) {
     MessageBoxA(NULL, "Hi", "fkdslhf", NULL);
 
-    // HANDLE hClient = GetModuleHandleA("client.dll");
     gameInfo.client = GetModuleHandleA("client.dll");
     gameInfo.engine = GetModuleHandleA("engine.dll");
     print(gameInfo.client, gameInfo.engine);
@@ -56,92 +59,40 @@ DWORD WINAPI vowelThread(LPVOID params) {
         DWORD localTeam = *(DWORD *) (gameInfo.localPlayer + netvars::m_iTeamNum); 
         DWORD localHealth = *(DWORD *) (gameInfo.localPlayer + netvars::m_iHealth);
 
-        // if (!glowOn) {
-        //     std::thread (modelEnglowThread, localTeam);
-        //     // modelEnglow(localTeam, glowTeammates);
-        //     glowOn = true;
-        //     return 1;
-        // }
-
-        if (glowOn && modelEnglow(localTeam, glowTeammates)) {
-            return 1;
+        if (glowOn) {
+            modelEnglow(localTeam, glowTeammates);
         }
 
         if (!GetAsyncKeyState(VK_LBUTTON)) {
             continue;
         }
 
-        Vector3 localEyePosition = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecOrigin)) + 
-            (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecViewOffset));
-
-        print(1, 1);
-        DWORD clientState = *(DWORD *) (gameInfo.engine + signatures::dwClientState);
-
-        Vector3 viewAngles = *(Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
-        Vector3 aimPunch = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_aimPunchAngle)) * 2;
-        print(1, 2);
-
-        float bestFov = 100.f;
-        Vector3 bestAngle = Vector3();
-
-        for (int i = 1; i <= 32; i++) {
-            print(0, i);
-            DWORD player = *(DWORD *) (gameInfo.client + signatures::dwEntityList + i * 0x10);
-
-            if (!player) {
-                continue;
-            }
-
-            if (*(DWORD *) (player + netvars::m_iTeamNum) == localTeam) {
-                continue;
-            }
-
-            if (*(bool *) (player + signatures::m_bDormant)) {
-                continue;
-            }
-
-            if (!(*(int *) (player + netvars::m_iHealth))) {
-                continue;
-            }
-
-            if (!(*(bool *) (player + netvars::m_bSpottedByMask))) {
-                continue;
-            }
-
-            print(player, i);
-
-            DWORD boneMatrix = *(DWORD *) (player + netvars::m_dwBoneMatrix);
-
-            Vector3 playerHeadPosition = Vector3 {
-                *(float *) (boneMatrix + 0x30 * 8 + 0x0C),
-                *(float *) (boneMatrix + 0x30 * 8 + 0x1C),
-                *(float *) (boneMatrix + 0x30 * 8 + 0x2C),
-            };
-
-            Vector3 angle = calcAngles(localEyePosition, playerHeadPosition, viewAngles + aimPunch);
-
-            float fov = std::hypot(angle.x, angle.y);
-
-            if (fov < bestFov) {
-                bestFov = fov;
-                bestAngle = angle;
-            }
-
+        if (aimOn) {
+            aimAtHead(localTeam, aimThroughObjects);
         }
 
-        print(1, 1);
-
-        if (!bestAngle.notChanged()) {
-            Vector3* newAngle = (Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
-            Vector3 tempAngle = viewAngles + bestAngle / 3.f;
-
-            newAngle->x = tempAngle.x;
-            newAngle->y = tempAngle.y;
-            newAngle->z = tempAngle.z;
-        }
+        changeSettings();
     }
 
     return 0;
+}
+
+void changeSettings() {
+    if (GetAsyncKeyState(VK_NUMPAD0)) {
+        glowOn = !glowOn;
+    }
+
+    if (GetAsyncKeyState(VK_NUMPAD1)) {
+        glowTeammates = !glowTeammates;
+    }
+
+    if (GetAsyncKeyState(VK_NUMPAD2)) {
+        aimOn = !aimOn;
+    }
+
+    if (GetAsyncKeyState(VK_NUMPAD3)) {
+        aimThroughObjects = !aimThroughObjects;
+    }
 }
 
 int modelEnglowThread(DWORD localTeam) {
@@ -189,6 +140,81 @@ int modelEnglow(DWORD localTeam, bool glowTeammates) {
         pGlow->m_bRenderWhenOccluded = true;
         pGlow->m_bRenderWhenUnoccluded = false;
         pGlow->a = 0.55f;
+    }
+
+    return 0;
+}
+
+int aimAtHead(DWORD localTeam, bool throughObjects) {
+
+    using namespace hazedumper;
+    Vector3 localEyePosition = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecOrigin)) + 
+        (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecViewOffset));
+
+    print(1, 1);
+    DWORD clientState = *(DWORD *) (gameInfo.engine + signatures::dwClientState);
+
+    Vector3 viewAngles = *(Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
+    Vector3 aimPunch = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_aimPunchAngle)) * 2;
+    print(1, 2);
+
+    float bestFov = 100.f;
+    Vector3 bestAngle = Vector3();
+
+    for (int i = 1; i <= 32; i++) {
+        print(0, i);
+        DWORD player = *(DWORD *) (gameInfo.client + signatures::dwEntityList + i * 0x10);
+
+        if (!player) {
+            continue;
+        }
+
+        if (*(DWORD *) (player + netvars::m_iTeamNum) == localTeam) {
+            continue;
+        }
+
+        if (*(bool *) (player + signatures::m_bDormant)) {
+            continue;
+        }
+
+        if (!(*(int *) (player + netvars::m_iHealth))) {
+            continue;
+        }
+
+        if (!throughObjects && !(*(bool *) (player + netvars::m_bSpottedByMask))) {
+            continue;
+        }
+
+        print(player, i);
+
+        DWORD boneMatrix = *(DWORD *) (player + netvars::m_dwBoneMatrix);
+
+        Vector3 playerHeadPosition = Vector3 {
+            *(float *) (boneMatrix + 0x30 * 8 + 0x0C),
+            *(float *) (boneMatrix + 0x30 * 8 + 0x1C),
+            *(float *) (boneMatrix + 0x30 * 8 + 0x2C),
+        };
+
+        Vector3 angle = calcAngles(localEyePosition, playerHeadPosition, viewAngles + aimPunch);
+
+        float fov = std::hypot(angle.x, angle.y);
+
+        if (fov < bestFov) {
+            bestFov = fov;
+            bestAngle = angle;
+        }
+
+    }
+
+    print(1, 1);
+
+    if (!bestAngle.notChanged()) {
+        Vector3* newAngle = (Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
+        Vector3 tempAngle = viewAngles + bestAngle / 3.f;
+
+        newAngle->x = tempAngle.x;
+        newAngle->y = tempAngle.y;
+        newAngle->z = tempAngle.z;
     }
 
     return 0;

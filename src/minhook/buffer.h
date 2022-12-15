@@ -26,8 +26,8 @@
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
-
+#ifndef _BUFFER_HOOK
+#define _BUFFER_HOOK
 // Size of each memory slot.
 #if defined(_M_X64) || defined(__x86_64__)
     #define MEMORY_SLOT_SIZE 64
@@ -40,3 +40,5 @@ VOID   UninitializeBuffer(VOID);
 LPVOID AllocateBuffer(LPVOID pOrigin);
 VOID   FreeBuffer(LPVOID pBuffer);
 BOOL   IsExecutableAddress(LPVOID pAddress);
+
+#endif

@@ -25,9 +25,8 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma once
-
+#ifndef _MINHOOK
+#define _MINHOOK
 #if !(defined _M_IX86) && !(defined _M_X64) && !(defined __i386__) && !(defined __x86_64__)
     #error MinHook supports only x86 and x64 systems.
 #endif
@@ -182,4 +181,6 @@ extern "C" {
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

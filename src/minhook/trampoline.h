@@ -26,10 +26,10 @@
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#ifndef _TRAMPOLINE
+#define _TRAMPOLINE
 
 #pragma pack(push, 1)
-
 // Structs for writing x86/x64 instructions.
 
 // 8-bit relative jump.
@@ -103,3 +103,5 @@ typedef struct _TRAMPOLINE
 } TRAMPOLINE, *PTRAMPOLINE;
 
 BOOL CreateTrampolineFunction(PTRAMPOLINE ct);
+
+#endif

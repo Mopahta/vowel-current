@@ -2,19 +2,18 @@
 #include "offset.h"
 #include "structs/glowStruct.h"
 #include "structs/sessionInfo.h"
-#include "structs/vector.h"
-
-// #define _DEBUG
+#include "structs/vector.hpp"
+#include "core/hooks.h"
+#include "utils/utils.cpp"
 
 extern "C" __declspec(dllexport) BOOL vowelMain();
+
 int modelEnglow(DWORD localTeam, bool glowTeammates);
 Vector3 calcAngles(const Vector3& localPosition, const Vector3& enemyPosition, const Vector3& viewAngles);
 int modelEnglowThread(DWORD localTeam);
 int aimAtHead(DWORD localTeam, bool throughObjects);
 void changeSettings();
-
-char str1[256] = {0};
-char str2[256] = {0};
+int findNetvars();
 
 gameInfoStruct gameInfo;
 bool glowOn = true;
@@ -22,30 +21,21 @@ bool glowTeammates = true;
 bool aimOn = true;
 bool aimThroughObjects = false;
 
-#ifdef _DEBUG
-#define print(value1, value2) sprintf(str1, "%x", value1); \
-    sprintf(str2, "%x", value2); \
-    if (MessageBoxA(NULL, str1, str2, MB_OKCANCEL) == IDCANCEL) { \
-        return 1; \
-    }
-#else
-#define print(str1, str2)
-#endif
-
-typedef struct vector3 {
-    float x;
-    float y;
-    float z;
-} vector3;
-
 DWORD WINAPI vowelThread(LPVOID params) {
     MessageBoxA(NULL, "Hi", "fkdslhf", NULL);
 
     gameInfo.client = GetModuleHandleA("client.dll");
     gameInfo.engine = GetModuleHandleA("engine.dll");
+
+    // findNetvars();
+
+    interfaces::init();
+    print(interfaces::getPanelP, 1);
+    hooks::init();
+    // print(0, 2);
+
     print(gameInfo.client, gameInfo.engine);
     int retButtonPressed = 0;
-
 
     while (!GetAsyncKeyState(VK_END)) {
         // std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -56,12 +46,15 @@ DWORD WINAPI vowelThread(LPVOID params) {
         static char str2[256] = {0};
     
         gameInfo.localPlayer = *(DWORD *) (gameInfo.client + signatures::dwLocalPlayer); 
+
         DWORD localTeam = *(DWORD *) (gameInfo.localPlayer + netvars::m_iTeamNum); 
         DWORD localHealth = *(DWORD *) (gameInfo.localPlayer + netvars::m_iHealth);
 
         if (glowOn) {
             modelEnglow(localTeam, glowTeammates);
         }
+
+        changeSettings();
 
         if (!GetAsyncKeyState(VK_LBUTTON)) {
             continue;
@@ -70,9 +63,9 @@ DWORD WINAPI vowelThread(LPVOID params) {
         if (aimOn) {
             aimAtHead(localTeam, aimThroughObjects);
         }
-
-        changeSettings();
     }
+
+    hooks::destroy();
 
     return 0;
 }
@@ -107,6 +100,7 @@ int modelEnglow(DWORD localTeam, bool glowTeammates) {
     using namespace hazedumper;
     gameInfo.glowObjManager = *(DWORD *) (gameInfo.client + signatures::dwGlowObjectManager);
     int glowCount = *(int *) (gameInfo.client + signatures::dwGlowObjectManager + 0x4);
+    // int glowCount = *(int *) (gameInfo.glowObjManager + 0x4);
 
     for (int i = 0; i < glowCount; i++) {
         DWORD entity = *(DWORD *) (gameInfo.glowObjManager + (i * 0x38) + 0x4);
@@ -151,18 +145,15 @@ int aimAtHead(DWORD localTeam, bool throughObjects) {
     Vector3 localEyePosition = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecOrigin)) + 
         (*(Vector3 *) (gameInfo.localPlayer + netvars::m_vecViewOffset));
 
-    print(1, 1);
-    DWORD clientState = *(DWORD *) (gameInfo.engine + signatures::dwClientState);
+    gameInfo.clientState = *(DWORD *) (gameInfo.engine + signatures::dwClientState);
 
-    Vector3 viewAngles = *(Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
+    Vector3 viewAngles = *(Vector3 *) (gameInfo.clientState + signatures::dwClientState_ViewAngles);
     Vector3 aimPunch = (*(Vector3 *) (gameInfo.localPlayer + netvars::m_aimPunchAngle)) * 2;
-    print(1, 2);
 
     float bestFov = 100.f;
     Vector3 bestAngle = Vector3();
 
     for (int i = 1; i <= 32; i++) {
-        print(0, i);
         DWORD player = *(DWORD *) (gameInfo.client + signatures::dwEntityList + i * 0x10);
 
         if (!player) {
@@ -185,7 +176,6 @@ int aimAtHead(DWORD localTeam, bool throughObjects) {
             continue;
         }
 
-        print(player, i);
 
         DWORD boneMatrix = *(DWORD *) (player + netvars::m_dwBoneMatrix);
 
@@ -206,10 +196,8 @@ int aimAtHead(DWORD localTeam, bool throughObjects) {
 
     }
 
-    print(1, 1);
-
     if (!bestAngle.notChanged()) {
-        Vector3* newAngle = (Vector3 *) (clientState + signatures::dwClientState_ViewAngles);
+        Vector3* newAngle = (Vector3 *) (gameInfo.clientState + signatures::dwClientState_ViewAngles);
         Vector3 tempAngle = viewAngles + bestAngle / 3.f;
 
         newAngle->x = tempAngle.x;
@@ -222,6 +210,18 @@ int aimAtHead(DWORD localTeam, bool throughObjects) {
 
 Vector3 calcAngles(const Vector3& localPosition, const Vector3& enemyPosition, const Vector3& viewAngles) {
     return ((enemyPosition - localPosition).toAngle() - viewAngles);
+}
+
+int findNetvars() {
+    using namespace hazedumper::signatures;
+    gameInfo.clientState = *(DWORD *) (utils::PatternScan(gameInfo.engine, "A1 ? ? ? ? 8B 80 ? ? ? ? C3") + 1);
+    gameInfo.localPlayer = *(DWORD *) (utils::PatternScan(gameInfo.client, "8B 0D ? ? ? ? 83 FF FF 74 07") + 2);
+    gameInfo.glowObjManager = *(DWORD *) (utils::PatternScan(gameInfo.client, "0F 11 05 ? ? ? ? 83 C8 01") + 3);
+
+    print(gameInfo.clientState, *(DWORD *) (gameInfo.engine + dwClientState));
+    print(gameInfo.localPlayer, *(DWORD *) (gameInfo.client + dwLocalPlayer));
+
+    return 0;
 }
 
 extern "C" __declspec(dllexport) BOOL vowelMain() {

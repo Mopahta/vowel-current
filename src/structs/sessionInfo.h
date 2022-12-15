@@ -7,6 +7,7 @@ typedef struct gameInfoStruct {
     HANDLE engine;
     DWORD glowObjManager;
     DWORD localPlayer;
+    DWORD clientState;
 
 } gameInfoStruct;
 
